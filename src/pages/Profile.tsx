@@ -94,28 +94,29 @@ const Profile = () => {
     <AppLayout>
       <div className="space-y-8 animate-fade-in">
         <div className="text-center">
-          <div className="w-20 h-20 rounded-full gradient-gold mx-auto flex items-center justify-center text-primary-foreground text-2xl font-display font-bold">
+          <div className="w-22 h-22 rounded-full gradient-gold mx-auto flex items-center justify-center text-primary-foreground text-3xl font-display font-bold shadow-gold"
+            style={{ width: "5.5rem", height: "5.5rem" }}>
             {profile.name?.charAt(0)?.toUpperCase()}
           </div>
           <h2 className="text-2xl font-display font-semibold mt-4">{profile.name}</h2>
-          <p className="text-sm text-muted-foreground">{profile.location} · {profile.age} years old</p>
+          <p className="text-sm text-muted-foreground mt-0.5">{profile.location} · {profile.age} years old</p>
         </div>
 
-        <div className="space-y-4">
-          <div className="bg-card rounded-xl border border-border p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Occupation</p>
+        <div className="space-y-3">
+          <div className="card-elevated rounded-2xl p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-widest mb-2 font-medium">Occupation</p>
             <p className="font-medium">{profile.occupation}</p>
           </div>
-          <div className="bg-card rounded-xl border border-border p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Style</p>
+          <div className="card-elevated rounded-2xl p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium">Style</p>
             <div className="flex flex-wrap gap-2">
               {profile.styles?.map((s: string) => (
-                <span key={s} className="text-sm px-3 py-1 rounded-full bg-secondary">{STYLE_MAP[s] || s}</span>
+                <span key={s} className="text-sm px-3 py-1 rounded-full bg-secondary font-medium">{STYLE_MAP[s] || s}</span>
               ))}
             </div>
           </div>
-          <div className="bg-card rounded-xl border border-border p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Budget</p>
+          <div className="card-elevated rounded-2xl p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-widest mb-2 font-medium">Budget</p>
             <p className="font-medium">{BUDGET_MAP[profile.budget] || profile.budget}</p>
           </div>
         </div>
@@ -125,18 +126,18 @@ const Profile = () => {
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-display font-semibold">Style Photos</h3>
             <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handlePhotoUpload} />
-            <Button variant="ghost" size="sm" className="text-gold" onClick={() => fileInputRef.current?.click()}>
+            <Button variant="ghost" size="sm" className="text-gold hover:text-gold/80 hover:bg-gold/5 rounded-xl" onClick={() => fileInputRef.current?.click()}>
               <Camera className="w-4 h-4 mr-1" /> Add
             </Button>
           </div>
           {stylePhotos.length > 0 ? (
             <div className="grid grid-cols-3 gap-3">
               {stylePhotos.map((photo) => (
-                <div key={photo.id} className="relative aspect-square rounded-xl overflow-hidden border border-border group">
-                  <img src={photo.url} alt="Style" className="w-full h-full object-cover" />
+                <div key={photo.id} className="relative aspect-square rounded-2xl overflow-hidden ring-1 ring-border/40 group">
+                  <img src={photo.url} alt="Style" className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105" />
                   <button
                     onClick={() => deletePhoto(photo)}
-                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-foreground/60 items-center justify-center hidden group-hover:flex"
+                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-foreground/70 backdrop-blur-sm items-center justify-center hidden group-hover:flex"
                   >
                     <Trash2 className="w-3 h-3 text-background" />
                   </button>
@@ -144,15 +145,17 @@ const Profile = () => {
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">Upload outfit photos to improve your recommendations.</p>
+            <div className="card-elevated rounded-2xl p-8 text-center">
+              <p className="text-sm text-muted-foreground leading-relaxed">Upload outfit photos to improve your AI recommendations.</p>
+            </div>
           )}
         </div>
 
-        <div className="flex gap-3">
-          <Button variant="outline" className="flex-1" onClick={() => navigate("/onboarding")}>
+        <div className="flex gap-3 pb-2">
+          <Button variant="outline" className="flex-1 rounded-xl border-border/70 hover:bg-secondary/60 transition-all" onClick={() => navigate("/onboarding")}>
             <Edit className="w-4 h-4 mr-2" /> Edit Profile
           </Button>
-          <Button variant="outline" className="text-destructive hover:text-destructive" onClick={handleSignOut}>
+          <Button variant="outline" className="rounded-xl border-border/70 text-destructive hover:text-destructive hover:bg-destructive/5 transition-all" onClick={handleSignOut}>
             <LogOut className="w-4 h-4 mr-2" /> Sign Out
           </Button>
         </div>

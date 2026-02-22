@@ -61,39 +61,42 @@ const ItemCard = ({
 }) => {
   const img = getItemImage(item.name);
   return (
-    <div className="bg-card rounded-xl border border-border overflow-hidden animate-fade-in" style={{ animationDelay: `${index * 60}ms` }}>
+    <div className="card-elevated rounded-2xl overflow-hidden opacity-0 animate-slide-in" style={{ animationDelay: `${index * 60}ms` }}>
       <div className="flex gap-4 p-4">
-        <div className="w-24 h-24 rounded-lg flex-shrink-0 overflow-hidden border border-border">
+        <div className="w-24 h-24 rounded-xl flex-shrink-0 overflow-hidden">
           <img src={img} alt={item.name} className="w-full h-full object-cover" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className="font-medium text-sm">{item.name}</p>
-              <p className="text-xs text-muted-foreground">{item.brand}</p>
+              <p className="font-semibold text-sm leading-snug">{item.name}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{item.brand}</p>
             </div>
-            <button onClick={() => onToggle(item)} className="flex-shrink-0">
-              <Heart className={`w-5 h-5 transition-colors ${isFav ? "fill-destructive text-destructive" : "text-muted-foreground hover:text-foreground"}`} />
+            <button
+              onClick={() => onToggle(item)}
+              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary/60 transition-colors"
+            >
+              <Heart className={`w-4.5 h-4.5 transition-all duration-200 ${isFav ? "fill-rose-500 text-rose-500 scale-110" : "text-muted-foreground hover:text-rose-400"}`} />
             </button>
           </div>
           <div className="flex items-center gap-2 mt-2">
-            <span className="text-sm font-semibold">${item.price}</span>
-            <Badge variant="secondary" className="text-xs gap-1">
+            <span className="text-sm font-bold text-foreground">${item.price}</span>
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-secondary/70 text-secondary-foreground">
               <Star className="w-3 h-3 text-gold" />
-              {item.match_score}% match
-            </Badge>
+              {item.match_score}%
+            </span>
           </div>
-          <p className="text-xs text-muted-foreground mt-1.5">{item.reason}</p>
+          <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{item.reason}</p>
           <div className="flex gap-1.5 mt-2 flex-wrap">
             {item.tags?.map((tag) => (
-              <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">{tag}</span>
+              <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-secondary/70 text-muted-foreground">{tag}</span>
             ))}
           </div>
           <a
             href={getAmazonLink(item)}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-3 flex items-center gap-1.5 text-xs font-medium text-gold hover:text-gold/80 transition-colors"
+            className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-gold hover:text-gold/70 transition-colors"
           >
             <ShoppingBag className="w-3.5 h-3.5" />
             Shop on Amazon
@@ -191,11 +194,11 @@ const Shop = () => {
           <Button
             variant="ghost"
             size="sm"
-            className="text-gold hover:text-gold/80"
+            className="text-gold hover:text-gold/80 hover:bg-gold/5 rounded-xl transition-all"
             onClick={generateRecs}
             disabled={loading}
           >
-            {loading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+            {loading ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
             {recommendations ? "Refresh" : "Generate"}
           </Button>
         </div>
@@ -241,8 +244,8 @@ const Shop = () => {
                 ))}
             </div>
           ) : (
-            <div className="bg-card rounded-xl border border-border p-8 text-center">
-              <p className="text-muted-foreground text-sm">
+            <div className="card-elevated rounded-2xl p-10 text-center">
+              <p className="text-muted-foreground text-sm leading-relaxed">
                 Tap Generate to get AI-powered shopping recommendations personalized to your style, closet, and budget.
               </p>
             </div>

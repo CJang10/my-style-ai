@@ -199,28 +199,28 @@ const Closet = () => {
 
         <div className="grid grid-cols-3 gap-3">
           {filtered.map((item, i) => (
-            <div key={item.id} className="group animate-fade-in relative" style={{ animationDelay: `${i * 40}ms` }}>
-              <div className="aspect-square rounded-xl border border-border overflow-hidden transition-transform group-hover:scale-[1.03]">
+            <div key={item.id} className="group opacity-0 animate-fade-in relative" style={{ animationDelay: `${i * 40}ms` }}>
+              <div className="aspect-square rounded-2xl overflow-hidden shadow-sm ring-1 ring-border/40 transition-transform duration-200 group-hover:scale-[1.04] group-hover:shadow-md">
                 {item.imageUrl ? (
                   <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: item.color }} />
+                  <div className="w-full h-full" style={{ backgroundColor: item.color }} />
                 )}
               </div>
               <button
                 onClick={() => deleteItem(item)}
-                className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-foreground/60 items-center justify-center hidden group-hover:flex transition-all"
+                className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-foreground/70 backdrop-blur-sm items-center justify-center hidden group-hover:flex transition-all"
               >
                 <Trash2 className="w-3 h-3 text-background" />
               </button>
-              <p className="mt-2 text-xs font-medium truncate">{item.name}</p>
+              <p className="mt-2 text-xs font-semibold truncate leading-snug">{item.name}</p>
               <p className="text-xs text-muted-foreground">{item.category}</p>
             </div>
           ))}
         </div>
 
         {filtered.length === 0 && (
-          <div className="text-center py-12">
+          <div className="card-elevated rounded-2xl text-center py-14">
             <p className="text-muted-foreground text-sm">
               {items.length === 0 ? "Your closet is empty. Start adding pieces!" : "No items match your filter."}
             </p>

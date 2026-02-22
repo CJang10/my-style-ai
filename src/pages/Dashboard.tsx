@@ -149,49 +149,51 @@ const Dashboard = () => {
 
   return (
     <AppLayout>
-      <div className="space-y-8 animate-fade-in">
-        <div>
-          <p className="text-muted-foreground text-sm font-medium uppercase tracking-wider">
+      <div className="space-y-6 animate-fade-in">
+        {/* Greeting */}
+        <div className="pt-2">
+          <p className="text-muted-foreground text-xs font-medium uppercase tracking-widest mb-1">
             {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
           </p>
-          <h2 className="text-3xl font-display font-semibold mt-1">
+          <h2 className="text-3xl font-display font-semibold">
             {greeting()}, <span className="text-gold italic">{profile?.name || "there"}</span>
           </h2>
         </div>
 
         {/* Weather */}
-        <div className="bg-card rounded-xl border border-border p-5">
+        <div className="card-elevated rounded-2xl p-5">
           {weatherLoading ? (
             <div className="flex items-center gap-4">
-              <div className="w-8 h-8 rounded-full bg-secondary animate-pulse" />
+              <div className="w-10 h-10 rounded-full bg-secondary animate-pulse" />
               <div className="space-y-2">
-                <div className="h-6 w-20 bg-secondary rounded animate-pulse" />
-                <div className="h-3 w-32 bg-secondary rounded animate-pulse" />
+                <div className="h-5 w-20 bg-secondary rounded-lg animate-pulse" />
+                <div className="h-3 w-32 bg-secondary rounded-lg animate-pulse" />
               </div>
             </div>
           ) : weather ? (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <WeatherIcon />
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center"
+                  style={{ background: "hsl(var(--gold) / 0.1)" }}>
+                  <WeatherIcon />
+                </div>
                 <div>
-                  <p className="text-3xl font-display font-semibold">{weather.temp}°F</p>
-                  <p className="text-sm text-muted-foreground">{profile?.location || "Your city"} · {weather.condition}</p>
+                  <p className="text-3xl font-display font-semibold">{weather.temp}°</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{profile?.location} · {weather.condition}</p>
                 </div>
               </div>
-              <div className="text-right text-sm text-muted-foreground space-y-1">
-                <p>H: {weather.high}° L: {weather.low}°</p>
+              <div className="text-right text-xs text-muted-foreground space-y-1.5">
+                <p className="font-medium">H:{weather.high}° L:{weather.low}°</p>
                 <p className="flex items-center gap-1 justify-end"><Wind className="w-3 h-3" /> {weather.wind} mph</p>
               </div>
             </div>
           ) : (
             <div className="flex items-center gap-3 text-muted-foreground">
-              <Cloud className="w-6 h-6" />
+              <Cloud className="w-5 h-5" />
               <div>
                 <p className="text-sm font-medium">Weather unavailable</p>
-                <p className="text-xs">
-                  {profile?.location
-                    ? `Couldn't fetch weather for "${profile.location}"`
-                    : "Set your location in Profile to see weather"}
+                <p className="text-xs opacity-70">
+                  {profile?.location ? `Couldn't load weather for "${profile.location}"` : "Add your location in Profile"}
                 </p>
               </div>
             </div>
@@ -205,11 +207,11 @@ const Dashboard = () => {
             <Button
               variant="ghost"
               size="sm"
-              className="text-gold hover:text-gold/80"
+              className="text-gold hover:text-gold/80 hover:bg-gold/5 rounded-xl transition-all"
               onClick={generateOutfit}
               disabled={loading}
             >
-              {loading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+              {loading ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
               {aiOutfit ? "Regenerate" : "Generate"}
             </Button>
           </div>
@@ -219,30 +221,30 @@ const Dashboard = () => {
               {aiOutfit.outfit.map((item, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-4 bg-card rounded-xl border border-border p-4 animate-slide-in"
+                  className="flex items-center gap-4 card-elevated rounded-2xl p-4 opacity-0 animate-slide-in"
                   style={{ animationDelay: `${i * 80}ms` }}
                 >
-                  <div className="w-10 h-10 rounded-lg gradient-gold flex items-center justify-center text-primary-foreground text-xs font-bold">
+                  <div className="w-10 h-10 rounded-xl gradient-gold flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0 shadow-gold">
                     {i + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm">{item.item}</p>
-                    <p className="text-xs text-muted-foreground">{item.styling_tip}</p>
+                    <p className="font-medium text-sm leading-snug">{item.item}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{item.styling_tip}</p>
                   </div>
-                  <span className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded-full">{item.category}</span>
+                  <span className="text-xs text-muted-foreground bg-secondary/70 px-2.5 py-1 rounded-full flex-shrink-0">{item.category}</span>
                 </div>
               ))}
-              <div className="gradient-gold rounded-xl p-5 text-primary-foreground mt-4">
+              <div className="gradient-gold rounded-2xl p-5 text-primary-foreground mt-2 shadow-gold">
                 <p className="font-display text-base font-semibold">Style Note</p>
-                <p className="text-sm mt-1 opacity-90">{aiOutfit.style_note}</p>
+                <p className="text-sm mt-1.5 opacity-90 leading-relaxed">{aiOutfit.style_note}</p>
                 {aiOutfit.weather_tip && (
-                  <p className="text-sm mt-2 opacity-80 border-t border-primary-foreground/20 pt-2">{aiOutfit.weather_tip}</p>
+                  <p className="text-sm mt-3 opacity-80 border-t border-primary-foreground/20 pt-3 leading-relaxed">{aiOutfit.weather_tip}</p>
                 )}
               </div>
             </div>
           ) : (
-            <div className="bg-card rounded-xl border border-border p-8 text-center">
-              <p className="text-muted-foreground text-sm">
+            <div className="card-elevated rounded-2xl p-10 text-center">
+              <p className="text-muted-foreground text-sm leading-relaxed">
                 {closetItems.length === 0
                   ? "Add items to your closet, then generate your first AI outfit."
                   : "Tap Generate to get your personalized outfit for today."}

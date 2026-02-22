@@ -119,6 +119,41 @@
     background: linear-gradient(135deg, hsl(var(--gold)), hsl(var(--gold-glow)));
   }
   .shadow-gold {
-    box-shadow: 0 4px 20px -4px hsl(var(--gold) / 0.3);
+    box-shadow: 0 4px 24px -4px hsl(var(--gold) / 0.35);
+  }
+  .card-elevated {
+    background: hsl(var(--card));
+    box-shadow: 0 1px 2px hsl(var(--espresso) / 0.04),
+                0 4px 12px hsl(var(--espresso) / 0.06),
+                0 0 0 1px hsl(var(--border) / 0.6);
+    border: none;
+  }
+  .card-flat {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border) / 0.7);
+  }
+  .animate-delay-100 { animation-delay: 100ms; }
+  .animate-delay-200 { animation-delay: 200ms; }
+  .animate-delay-300 { animation-delay: 300ms; }
+  .animate-delay-400 { animation-delay: 400ms; }
+  .animate-delay-500 { animation-delay: 500ms; }
+  .animate-delay-600 { animation-delay: 600ms; }
+  .animate-delay-700 { animation-delay: 700ms; }
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 999px;
   }
 }
