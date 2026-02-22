@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { Heart, Star, Loader2, RefreshCw } from "lucide-react";
+import { Heart, Star, Loader2, RefreshCw, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -25,6 +25,20 @@ const PRODUCT_IMAGES: Record<string, string> = {
 
 const FALLBACK_IMAGES = [productOvercoat, productMerino, productDenim, productTote, productBoots, productLinenShirt];
 
+const AMAZON_TAG = "stylevaultai-20";
+
+function getAmazonLink(item: Recommendation): string {
+  const query = encodeURIComponent(`${item.name} ${item.brand}`);
+  return `https://www.amazon.com/s?k=${query}&tag=${AMAZON_TAG}`;
+}
+
+// Pick a consistent image for any item name so it never changes when moving sections
+function getItemImage(name: string): string {
+  if (PRODUCT_IMAGES[name]) return PRODUCT_IMAGES[name];
+  const hash = name.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  return FALLBACK_IMAGES[hash % FALLBACK_IMAGES.length];
+}
+
 interface Recommendation {
   name: string;
   brand: string;
@@ -34,9 +48,65 @@ interface Recommendation {
   tags: string[];
 }
 
+const ItemCard = ({
+  item,
+  index,
+  isFav,
+  onToggle,
+}: {
+  item: Recommendation;
+  index: number;
+  isFav: boolean;
+  onToggle: (item: Recommendation) => void;
+}) => {
+  const img = getItemImage(item.name);
+  return (
+    <div className="bg-card rounded-xl border border-border overflow-hidden animate-fade-in" style={{ animationDelay: `${index * 60}ms` }}>
+      <div className="flex gap-4 p-4">
+        <div className="w-24 h-24 rounded-lg flex-shrink-0 overflow-hidden border border-border">
+          <img src={img} alt={item.name} className="w-full h-full object-cover" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="font-medium text-sm">{item.name}</p>
+              <p className="text-xs text-muted-foreground">{item.brand}</p>
+            </div>
+            <button onClick={() => onToggle(item)} className="flex-shrink-0">
+              <Heart className={`w-5 h-5 transition-colors ${isFav ? "fill-destructive text-destructive" : "text-muted-foreground hover:text-foreground"}`} />
+            </button>
+          </div>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-sm font-semibold">${item.price}</span>
+            <Badge variant="secondary" className="text-xs gap-1">
+              <Star className="w-3 h-3 text-gold" />
+              {item.match_score}% match
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1.5">{item.reason}</p>
+          <div className="flex gap-1.5 mt-2 flex-wrap">
+            {item.tags?.map((tag) => (
+              <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">{tag}</span>
+            ))}
+          </div>
+          <a
+            href={getAmazonLink(item)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 flex items-center gap-1.5 text-xs font-medium text-gold hover:text-gold/80 transition-colors"
+          >
+            <ShoppingBag className="w-3.5 h-3.5" />
+            Shop on Amazon
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Shop = () => {
   const { user } = useAuth();
-  const [favorites, setFavorites] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState<Recommendation[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [recommendations, setRecommendations] = useState<Recommendation[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,7 +114,19 @@ const Shop = () => {
   useEffect(() => {
     if (!user) return;
     supabase.from("profiles").select("*").eq("user_id", user.id).single().then(({ data }) => {
-      if (data) setProfile(data);
+      if (data) {
+        setProfile(data);
+        const saved = (data as any).favorites;
+        if (Array.isArray(saved) && saved.length > 0) {
+          if (typeof saved[0] === "object") {
+            // New format — full item objects
+            setFavorites(saved as Recommendation[]);
+          } else {
+            // Old format — just strings, clear it out since we can't recover full data
+            supabase.from("profiles").update({ favorites: [] } as any).eq("user_id", data.user_id);
+          }
+        }
+      }
     });
   }, [user]);
 
@@ -54,11 +136,7 @@ const Shop = () => {
     try {
       const { data: closetItems } = await supabase.from("closet_items").select("name, category, color, season").eq("user_id", user.id);
       const { data, error } = await supabase.functions.invoke("style-ai", {
-        body: {
-          type: "shopping",
-          profile,
-          closetItems: closetItems || [],
-        },
+        body: { type: "shopping", profile, closetItems: closetItems || [] },
       });
       if (error) throw error;
       if (data?.recommendations) setRecommendations(data.recommendations);
@@ -69,8 +147,28 @@ const Shop = () => {
     }
   };
 
-  const toggleFav = (name: string) => {
-    setFavorites((prev) => prev.includes(name) ? prev.filter((f) => f !== name) : [...prev, name]);
+  const saveFavorites = async (newFavorites: Recommendation[]) => {
+    const { error } = await supabase
+      .from("profiles")
+      .update({ favorites: newFavorites } as any)
+      .eq("user_id", user!.id);
+    if (error) {
+      console.error("Save favorite error:", error);
+      toast.error("Failed to save favorite");
+      return false;
+    }
+    return true;
+  };
+
+  const toggleFav = async (item: Recommendation) => {
+    if (!user) return;
+    const isFav = favorites.some((f) => f.name === item.name);
+    const newFavorites = isFav
+      ? favorites.filter((f) => f.name !== item.name)
+      : [...favorites, item];
+    setFavorites(newFavorites);
+    const ok = await saveFavorites(newFavorites);
+    if (!ok) setFavorites(favorites);
   };
 
   const budgetMap: Record<string, string> = {
@@ -82,7 +180,7 @@ const Shop = () => {
 
   return (
     <AppLayout>
-      <div className="space-y-6 animate-fade-in">
+      <div className="space-y-8 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-3xl font-display font-semibold">For <span className="text-gold italic">You</span></h2>
@@ -102,52 +200,54 @@ const Shop = () => {
           </Button>
         </div>
 
-        {recommendations ? (
-          <div className="space-y-4">
-            {recommendations.map((item, i) => {
-              const img = PRODUCT_IMAGES[item.name] || FALLBACK_IMAGES[i % FALLBACK_IMAGES.length];
-              return (
-                <div key={i} className="bg-card rounded-xl border border-border overflow-hidden animate-fade-in" style={{ animationDelay: `${i * 60}ms` }}>
-                  <div className="flex gap-4 p-4">
-                    <div className="w-24 h-24 rounded-lg flex-shrink-0 overflow-hidden border border-border">
-                      <img src={img} alt={item.name} className="w-full h-full object-cover" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="font-medium text-sm">{item.name}</p>
-                          <p className="text-xs text-muted-foreground">{item.brand}</p>
-                        </div>
-                        <button onClick={() => toggleFav(item.name)} className="flex-shrink-0">
-                          <Heart className={`w-5 h-5 transition-colors ${favorites.includes(item.name) ? "fill-destructive text-destructive" : "text-muted-foreground hover:text-foreground"}`} />
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-sm font-semibold">${item.price}</span>
-                        <Badge variant="secondary" className="text-xs gap-1">
-                          <Star className="w-3 h-3 text-gold" />
-                          {item.match_score}% match
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1.5">{item.reason}</p>
-                      <div className="flex gap-1.5 mt-2 flex-wrap">
-                        {item.tags?.map((tag) => (
-                          <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">{tag}</span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="bg-card rounded-xl border border-border p-8 text-center">
-            <p className="text-muted-foreground text-sm">
-              Tap Generate to get AI-powered shopping recommendations personalized to your style, closet, and budget.
-            </p>
+        {/* Saved Favorites */}
+        {favorites.length > 0 && (
+          <div>
+            <h3 className="text-lg font-display font-semibold mb-3 flex items-center gap-2">
+              <Heart className="w-4 h-4 fill-destructive text-destructive" />
+              Saved
+            </h3>
+            <div className="space-y-3">
+              {favorites.map((item, i) => (
+                <ItemCard
+                  key={item.name}
+                  item={item}
+                  index={i}
+                  isFav={true}
+                  onToggle={toggleFav}
+                />
+              ))}
+            </div>
           </div>
         )}
+
+        {/* AI Recommendations */}
+        <div>
+          {favorites.length > 0 && recommendations && (
+            <h3 className="text-lg font-display font-semibold mb-3">Recommendations</h3>
+          )}
+          {recommendations ? (
+            <div className="space-y-4">
+              {recommendations
+                .filter((item) => !favorites.some((f) => f.name === item.name))
+                .map((item, i) => (
+                  <ItemCard
+                    key={item.name}
+                    item={item}
+                    index={i}
+                    isFav={false}
+                    onToggle={toggleFav}
+                  />
+                ))}
+            </div>
+          ) : (
+            <div className="bg-card rounded-xl border border-border p-8 text-center">
+              <p className="text-muted-foreground text-sm">
+                Tap Generate to get AI-powered shopping recommendations personalized to your style, closet, and budget.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </AppLayout>
   );
