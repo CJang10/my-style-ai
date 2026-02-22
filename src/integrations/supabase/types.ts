@@ -14,7 +14,105 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      closet_items: {
+        Row: {
+          category: string
+          color: string | null
+          created_at: string
+          id: string
+          image_path: string | null
+          name: string
+          season: string | null
+          user_id: string
+        }
+        Insert: {
+          category: string
+          color?: string | null
+          created_at?: string
+          id?: string
+          image_path?: string | null
+          name: string
+          season?: string | null
+          user_id: string
+        }
+        Update: {
+          category?: string
+          color?: string | null
+          created_at?: string
+          id?: string
+          image_path?: string | null
+          name?: string
+          season?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          age: number | null
+          budget: string | null
+          created_at: string
+          id: string
+          location: string | null
+          name: string
+          occupation: string | null
+          styles: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          age?: number | null
+          budget?: string | null
+          created_at?: string
+          id?: string
+          location?: string | null
+          name: string
+          occupation?: string | null
+          styles?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          age?: number | null
+          budget?: string | null
+          created_at?: string
+          id?: string
+          location?: string | null
+          name?: string
+          occupation?: string | null
+          styles?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      style_photos: {
+        Row: {
+          ai_analysis: Json | null
+          caption: string | null
+          created_at: string
+          id: string
+          storage_path: string
+          user_id: string
+        }
+        Insert: {
+          ai_analysis?: Json | null
+          caption?: string | null
+          created_at?: string
+          id?: string
+          storage_path: string
+          user_id: string
+        }
+        Update: {
+          ai_analysis?: Json | null
+          caption?: string | null
+          created_at?: string
+          id?: string
+          storage_path?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

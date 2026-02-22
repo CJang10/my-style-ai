@@ -1,38 +1,72 @@
 import { useState, useEffect } from "react";
 import AppLayout from "@/components/AppLayout";
-import { Sun, Cloud, CloudRain, Thermometer, RefreshCw, Wind } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { Sun, Cloud, CloudRain, Wind, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
-const MOCK_WEATHER = {
-  temp: 72,
-  condition: "Sunny",
-  humidity: 45,
-  wind: 8,
-  high: 78,
-  low: 62,
-};
+interface Profile {
+  name: string;
+  location: string;
+  occupation: string;
+  styles: string[];
+  budget: string;
+  age: number;
+}
 
-const OUTFIT_ITEMS = [
-  { name: "Cream Linen Blazer", category: "Outerwear", color: "#F5E6D3" },
-  { name: "Navy Fitted Tee", category: "Top", color: "#2C3E50" },
-  { name: "Tan Chinos", category: "Bottoms", color: "#C4A882" },
-  { name: "White Leather Sneakers", category: "Shoes", color: "#FAFAFA" },
-  { name: "Gold Watch", category: "Accessory", color: "#D4A843" },
-];
+interface OutfitItem {
+  item: string;
+  category: string;
+  styling_tip: string;
+}
 
-const WeatherIcon = ({ condition }: { condition: string }) => {
-  if (condition === "Sunny") return <Sun className="w-8 h-8 text-gold" />;
-  if (condition === "Cloudy") return <Cloud className="w-8 h-8 text-muted-foreground" />;
-  return <CloudRain className="w-8 h-8 text-muted-foreground" />;
-};
+interface AIOutfit {
+  outfit: OutfitItem[];
+  style_note: string;
+  weather_tip: string;
+}
 
 const Dashboard = () => {
-  const [profile, setProfile] = useState<any>(null);
+  const { user } = useAuth();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [closetItems, setClosetItems] = useState<any[]>([]);
+  const [aiOutfit, setAiOutfit] = useState<AIOutfit | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [weather] = useState({ temp: 72, condition: "Sunny", high: 78, low: 62, wind: 8 });
 
   useEffect(() => {
-    const saved = localStorage.getItem("stylevault_profile");
-    if (saved) setProfile(JSON.parse(saved));
-  }, []);
+    if (!user) return;
+    const load = async () => {
+      const { data: p } = await supabase.from("profiles").select("*").eq("user_id", user.id).single();
+      if (p) setProfile(p as any);
+      const { data: items } = await supabase.from("closet_items").select("*").eq("user_id", user.id);
+      if (items) setClosetItems(items);
+    };
+    load();
+  }, [user]);
+
+  const generateOutfit = async () => {
+    if (!profile) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("style-ai", {
+        body: {
+          type: "daily-outfit",
+          profile,
+          closetItems: closetItems.map((i) => ({ name: i.name, category: i.category, color: i.color, season: i.season })),
+          weather,
+        },
+      });
+      if (error) throw error;
+      if (data?.outfit) setAiOutfit(data);
+      else toast.info("Add some items to your closet first for personalized outfits!");
+    } catch (e: any) {
+      toast.error(e.message || "Failed to generate outfit");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const greeting = () => {
     const hour = new Date().getHours();
@@ -41,10 +75,15 @@ const Dashboard = () => {
     return "Good evening";
   };
 
+  const WeatherIcon = () => {
+    if (weather.condition === "Sunny") return <Sun className="w-8 h-8 text-gold" />;
+    if (weather.condition === "Cloudy") return <Cloud className="w-8 h-8 text-muted-foreground" />;
+    return <CloudRain className="w-8 h-8 text-muted-foreground" />;
+  };
+
   return (
     <AppLayout>
       <div className="space-y-8 animate-fade-in">
-        {/* Greeting */}
         <div>
           <p className="text-muted-foreground text-sm font-medium uppercase tracking-wider">
             {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
@@ -54,61 +93,74 @@ const Dashboard = () => {
           </h2>
         </div>
 
-        {/* Weather Card */}
+        {/* Weather */}
         <div className="bg-card rounded-xl border border-border p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <WeatherIcon condition={MOCK_WEATHER.condition} />
+              <WeatherIcon />
               <div>
-                <p className="text-3xl font-display font-semibold">{MOCK_WEATHER.temp}°F</p>
+                <p className="text-3xl font-display font-semibold">{weather.temp}°F</p>
                 <p className="text-sm text-muted-foreground">{profile?.location || "Your city"}</p>
               </div>
             </div>
             <div className="text-right text-sm text-muted-foreground space-y-1">
-              <p>H: {MOCK_WEATHER.high}° L: {MOCK_WEATHER.low}°</p>
-              <p className="flex items-center gap-1 justify-end">
-                <Wind className="w-3 h-3" /> {MOCK_WEATHER.wind} mph
-              </p>
+              <p>H: {weather.high}° L: {weather.low}°</p>
+              <p className="flex items-center gap-1 justify-end"><Wind className="w-3 h-3" /> {weather.wind} mph</p>
             </div>
           </div>
         </div>
 
-        {/* Today's Outfit */}
+        {/* AI Outfit Section */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-display font-semibold">Today's Outfit</h3>
-            <Button variant="ghost" size="sm" className="text-gold hover:text-gold/80">
-              <RefreshCw className="w-4 h-4 mr-1" /> Shuffle
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-gold hover:text-gold/80"
+              onClick={generateOutfit}
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+              {aiOutfit ? "Regenerate" : "Generate"}
             </Button>
           </div>
 
-          <div className="space-y-3">
-            {OUTFIT_ITEMS.map((item, i) => (
-              <div
-                key={item.name}
-                className="flex items-center gap-4 bg-card rounded-xl border border-border p-4 animate-slide-in"
-                style={{ animationDelay: `${i * 80}ms` }}
-              >
+          {aiOutfit ? (
+            <div className="space-y-3">
+              {aiOutfit.outfit.map((item, i) => (
                 <div
-                  className="w-14 h-14 rounded-lg border border-border flex-shrink-0"
-                  style={{ backgroundColor: item.color }}
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">{item.category}</p>
+                  key={i}
+                  className="flex items-center gap-4 bg-card rounded-xl border border-border p-4 animate-slide-in"
+                  style={{ animationDelay: `${i * 80}ms` }}
+                >
+                  <div className="w-10 h-10 rounded-lg gradient-gold flex items-center justify-center text-primary-foreground text-xs font-bold">
+                    {i + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm">{item.item}</p>
+                    <p className="text-xs text-muted-foreground">{item.styling_tip}</p>
+                  </div>
+                  <span className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded-full">{item.category}</span>
                 </div>
+              ))}
+              <div className="gradient-gold rounded-xl p-5 text-primary-foreground mt-4">
+                <p className="font-display text-base font-semibold">Style Note</p>
+                <p className="text-sm mt-1 opacity-90">{aiOutfit.style_note}</p>
+                {aiOutfit.weather_tip && (
+                  <p className="text-sm mt-2 opacity-80 border-t border-primary-foreground/20 pt-2">{aiOutfit.weather_tip}</p>
+                )}
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Style Tip */}
-        <div className="gradient-gold rounded-xl p-5 text-primary-foreground">
-          <p className="font-display text-lg font-semibold">Style Tip</p>
-          <p className="text-sm mt-1 opacity-90">
-            Light layers work perfectly for today's weather. The linen blazer keeps it sharp 
-            without overheating — perfect for {profile?.occupation || "your day"}.
-          </p>
+            </div>
+          ) : (
+            <div className="bg-card rounded-xl border border-border p-8 text-center">
+              <p className="text-muted-foreground text-sm">
+                {closetItems.length === 0
+                  ? "Add items to your closet, then generate your first AI outfit."
+                  : "Tap Generate to get your personalized outfit for today."}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </AppLayout>
