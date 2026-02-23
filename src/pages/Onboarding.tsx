@@ -78,8 +78,8 @@ const Onboarding = () => {
     setUploading(true);
 
     try {
-      // Save profile
-      const { error: profileError } = await supabase.from("profiles").upsert({
+      // Save profile — update if exists, insert if new
+      const profileData = {
         user_id: user.id,
         name: profile.name,
         age: parseInt(profile.age),
@@ -87,7 +87,12 @@ const Onboarding = () => {
         occupation: profile.occupation,
         styles: profile.styles,
         budget: profile.budget,
-      }, { onConflict: "user_id" });
+      };
+      const { data: existing } = await supabase
+        .from("profiles").select("user_id").eq("user_id", user.id).single();
+      const { error: profileError } = existing
+        ? await supabase.from("profiles").update(profileData).eq("user_id", user.id)
+        : await supabase.from("profiles").insert(profileData);
       if (profileError) throw profileError;
 
       // Upload photos
