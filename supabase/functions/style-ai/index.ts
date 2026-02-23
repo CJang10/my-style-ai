@@ -7,11 +7,78 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { type, profile, closetItems, weather, stylePhotos } = await req.json();
+    const body = await req.json();
+    const { type } = body;
     console.log("style-ai called with type:", type);
+
     const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    console.log("API key found:", !!ANTHROPIC_API_KEY);
     if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured");
+
+    const headers = { ...corsHeaders, "Content-Type": "application/json" };
+
+    // ── Identify clothing item from photo (vision) ──────────────────────────
+    if (type === "identify-item") {
+      const { imageBase64, mediaType = "image/jpeg" } = body;
+      if (!imageBase64) throw new Error("No image data provided");
+
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 300,
+          messages: [{
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: { type: "base64", media_type: mediaType, data: imageBase64 },
+              },
+              {
+                type: "text",
+                text: `You are a fashion expert. Identify this clothing item from the photo.
+Return ONLY valid JSON with exactly these fields:
+{
+  "name": "specific descriptive item name (e.g. 'Slim Fit White Oxford Shirt', 'Black Leather Chelsea Boots')",
+  "category": "one of: Tops, Bottoms, Outerwear, Shoes, Accessories, Dresses",
+  "color": "hex color code of the primary color (e.g. '#FFFFFF', '#1A1A1A')",
+  "season": "one of: Spring, Summer, Fall, Winter, All-Season"
+}
+If the image does not contain a clothing item, return: {"error": "not a clothing item"}
+Return only the JSON object, nothing else.`,
+              },
+            ],
+          }],
+        }),
+      });
+
+      if (!response.ok) {
+        const t = await response.text();
+        console.error("Anthropic vision error:", response.status, t);
+        throw new Error(`Anthropic API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const content = data.content?.[0]?.text || "";
+      console.log("Vision response:", content);
+
+      let parsed;
+      try {
+        const match = content.match(/\{[\s\S]*\}/);
+        parsed = JSON.parse(match ? match[0] : content);
+      } catch {
+        parsed = { error: "Could not parse response" };
+      }
+
+      return new Response(JSON.stringify(parsed), { headers });
+    }
+
+    // ── Text-based prompts (outfit, shopping, analyze-photo) ────────────────
+    const { profile, closetItems, weather, stylePhotos } = body;
 
     let systemPrompt = "";
     let userPrompt = "";
@@ -25,10 +92,11 @@ Deno.serve(async (req) => {
     } else if (type === "analyze-photo") {
       systemPrompt = `You are StyleVault, a fashion analysis AI. Analyze the outfit in the uploaded photo and extract: colors, style category, formality level, season suitability, and key pieces. Return JSON: { "colors": ["color1"], "style": "style category", "formality": "casual/smart-casual/business/formal", "season": "season", "pieces": ["piece1"], "notes": "brief style analysis" }`;
       userPrompt = `Analyze this outfit photo and extract style data.`;
+    } else {
+      throw new Error(`Unknown type: ${type}`);
     }
 
     const messages: any[] = [];
-
     if (type === "analyze-photo" && stylePhotos?.[0]) {
       messages.push({
         role: "user",
@@ -59,7 +127,7 @@ Deno.serve(async (req) => {
     if (!response.ok) {
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 429, headers,
         });
       }
       const t = await response.text();
@@ -78,9 +146,8 @@ Deno.serve(async (req) => {
       parsed = { raw: content };
     }
 
-    return new Response(JSON.stringify(parsed), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify(parsed), { headers });
+
   } catch (e) {
     console.error("style-ai error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
