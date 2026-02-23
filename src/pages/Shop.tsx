@@ -116,6 +116,17 @@ const Shop = () => {
 
   useEffect(() => {
     if (!user) return;
+
+    // Load cached recs first so auto-generate doesn't fire unnecessarily
+    const cached = localStorage.getItem(`sv_shop_recs_${user.id}`);
+    if (cached) {
+      try {
+        const { recs, timestamp } = JSON.parse(cached);
+        const fresh = Date.now() - timestamp < 24 * 60 * 60 * 1000;
+        if (fresh && Array.isArray(recs)) setRecommendations(recs);
+      } catch {}
+    }
+
     supabase.from("profiles").select("*").eq("user_id", user.id).single().then(({ data }) => {
       if (data) {
         setProfile(data);
@@ -131,15 +142,16 @@ const Shop = () => {
     });
   }, [user]);
 
-  // Auto-generate on first visit once profile is ready
+  // Auto-generate only if no cached recs exist
   useEffect(() => {
     if (profile && user && recommendations === null && !loading) {
       generateRecs();
     }
   }, [profile]);
 
-  const generateRecs = async () => {
+  const generateRecs = async (bustCache = false) => {
     if (!profile || !user) return;
+    if (bustCache) localStorage.removeItem(`sv_shop_recs_${user.id}`);
     setLoading(true);
     try {
       const [{ data: closetItems }, { data: stylePhotoRows }] = await Promise.all([
@@ -155,7 +167,13 @@ const Shop = () => {
         body: { type: "shopping", profile, closetItems: closetItems || [], stylePhotos },
       });
       if (error) throw error;
-      if (data?.recommendations) setRecommendations(data.recommendations);
+      if (data?.recommendations) {
+        setRecommendations(data.recommendations);
+        localStorage.setItem(`sv_shop_recs_${user.id}`, JSON.stringify({
+          recs: data.recommendations,
+          timestamp: Date.now(),
+        }));
+      }
     } catch (e: any) {
       toast.error(e.message || "Failed to get recommendations");
     } finally {
@@ -208,7 +226,7 @@ const Shop = () => {
             variant="ghost"
             size="sm"
             className="text-gold hover:text-gold/80 hover:bg-gold/5 rounded-xl transition-all"
-            onClick={generateRecs}
+            onClick={() => generateRecs(true)}
             disabled={loading}
           >
             {loading ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
