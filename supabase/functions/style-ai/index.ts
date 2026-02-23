@@ -84,12 +84,18 @@ Return only the JSON object, nothing else.`,
     let userPrompt = "";
 
     if (type === "daily-outfit") {
-      const { occasion = "casual", wearHistory = [] } = body;
+      const { occasion = "casual", wearHistory = [], mode = "closet" } = body;
       const recentWears = wearHistory.length > 0
         ? `\n\nRecent outfits worn (avoid repeating the same combinations):\n${wearHistory.map((h: any) => `- ${h.date} (${h.occasion}): ${h.items.join(", ")}`).join("\n")}`
         : "";
-      systemPrompt = `You are StyleVault, an elite personal stylist AI. You create outfits from the user's actual closet items based on weather, occasion, their style preferences, occupation, and age. Avoid repeating recent outfit combinations. Be specific, fashion-forward, and practical. Return a JSON object with: { "outfit": [{ "item": "item name from closet", "category": "category", "styling_tip": "brief tip" }], "style_note": "overall outfit commentary", "weather_tip": "weather-specific advice" }`;
-      userPrompt = `Profile: ${JSON.stringify(profile)}\nWeather: ${JSON.stringify(weather)}\nOccasion: ${occasion}\nCloset items: ${JSON.stringify(closetItems)}${recentWears}\n\nCreate today's ${occasion} outfit recommendation.`;
+
+      if (mode === "vibe") {
+        systemPrompt = `You are StyleVault, an elite personal stylist AI. The user hasn't fully built their closet yet, so generate a complete outfit based purely on their style profile, lifestyle, weather, and occasion. Suggest specific, realistic items they likely own or would suit them perfectly. Be fashion-forward and practical. Return JSON: { "outfit": [{ "item": "specific item description", "category": "category", "styling_tip": "brief tip" }], "style_note": "outfit commentary — mention this is curated from their style profile", "weather_tip": "weather-specific advice" }`;
+        userPrompt = `Profile: ${JSON.stringify(profile)}\nWeather: ${JSON.stringify(weather)}\nOccasion: ${occasion}\n\nCreate a complete ${occasion} outfit tailored to their style, lifestyle, and current weather. These are style-profile suggestions since their closet is still being built.`;
+      } else {
+        systemPrompt = `You are StyleVault, an elite personal stylist AI. You create outfits strictly from the user's actual closet items based on weather, occasion, their style preferences, occupation, and age. Only use items that exist in their closet. Avoid repeating recent outfit combinations. Be specific, fashion-forward, and practical. Return a JSON object with: { "outfit": [{ "item": "item name from closet", "category": "category", "styling_tip": "brief tip" }], "style_note": "overall outfit commentary", "weather_tip": "weather-specific advice" }`;
+        userPrompt = `Profile: ${JSON.stringify(profile)}\nWeather: ${JSON.stringify(weather)}\nOccasion: ${occasion}\nCloset items: ${JSON.stringify(closetItems)}${recentWears}\n\nCreate today's ${occasion} outfit using only items from their closet.`;
+      }
     } else if (type === "shopping") {
       systemPrompt = `You are StyleVault, a personal shopping assistant. Analyze the user's closet, style, budget, and lifestyle to recommend specific items they should buy. Focus on filling gaps, upgrading basics, and matching their aesthetic. Return JSON: { "recommendations": [{ "name": "item name", "brand": "brand", "price": number, "reason": "why they need this", "match_score": number (0-100), "tags": ["tag1", "tag2"] }] }`;
       userPrompt = `Profile: ${JSON.stringify(profile)}\nCurrent closet: ${JSON.stringify(closetItems)}\n\nRecommend 6 items to buy.`;

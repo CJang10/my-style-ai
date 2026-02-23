@@ -110,6 +110,8 @@ const Dashboard = () => {
   const [wearHistory, setWearHistory] = useState<WearEntry[]>([]);
   const [wornToday, setWornToday] = useState(false);
   const [markingWorn, setMarkingWorn] = useState(false);
+  const [showClosetPrompt, setShowClosetPrompt] = useState(false);
+  const [outfitMode, setOutfitMode] = useState<"closet" | "vibe">("closet");
 
   useEffect(() => {
     if (!user) return;
@@ -159,14 +161,24 @@ const Dashboard = () => {
     load();
   }, [user]);
 
-  const generateOutfit = async () => {
+  const generateOutfit = async (mode: "closet" | "vibe" = "closet") => {
     if (!profile) return;
+
+    // If closet is thin and user hasn't chosen a mode yet, show the prompt
+    if (closetItems.length < 5 && mode === "closet") {
+      setShowClosetPrompt(true);
+      return;
+    }
+
+    setShowClosetPrompt(false);
+    setOutfitMode(mode);
     setLoading(true);
     setWornToday(false);
     try {
       const { data, error } = await supabase.functions.invoke("style-ai", {
         body: {
           type: "daily-outfit",
+          mode,
           profile,
           closetItems: closetItems.map((i) => ({
             name: i.name,
@@ -185,7 +197,7 @@ const Dashboard = () => {
       });
       if (error) throw error;
       if (data?.outfit) setAiOutfit(data);
-      else toast.info("Add some items to your closet first for personalized outfits!");
+      else toast.info("Couldn't generate an outfit — try again.");
     } catch (e: any) {
       toast.error(e.message || "Failed to generate outfit");
     } finally {
@@ -236,6 +248,50 @@ const Dashboard = () => {
 
   return (
     <AppLayout>
+      {/* Thin closet prompt */}
+      {showClosetPrompt && (
+        <div className="fixed inset-0 z-50 bg-background/85 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in">
+          <div className="card-elevated rounded-3xl p-7 w-full max-w-xs space-y-5">
+            <div>
+              <p className="font-display font-semibold text-lg">Your closet is light</p>
+              <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+                You have <span className="font-semibold text-foreground">{closetItems.length} {closetItems.length === 1 ? "item" : "items"}</span> scanned.
+                Outfit personalization works best with 5+ pieces. What would you like to do?
+              </p>
+            </div>
+
+            <div className="space-y-2.5">
+              <button
+                onClick={() => generateOutfit("vibe")}
+                className="w-full card-elevated rounded-2xl p-4 text-left hover:ring-1 hover:ring-gold/30 transition-all"
+              >
+                <p className="font-semibold text-sm">Generate from my vibe</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  AI picks based on your style, weather, and occasion — may include items you haven't scanned yet
+                </p>
+              </button>
+
+              <button
+                onClick={() => { setShowClosetPrompt(false); navigate("/closet"); }}
+                className="w-full gradient-gold rounded-2xl p-4 text-left shadow-gold"
+              >
+                <p className="font-semibold text-sm text-primary-foreground">Scan more items first</p>
+                <p className="text-xs text-primary-foreground/80 mt-1 leading-relaxed">
+                  Takes 2 minutes — point your camera at any clothing piece
+                </p>
+              </button>
+            </div>
+
+            <button
+              onClick={() => setShowClosetPrompt(false)}
+              className="w-full text-xs text-muted-foreground text-center py-1"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6 animate-fade-in">
 
         {/* Greeting */}
@@ -322,10 +378,17 @@ const Dashboard = () => {
         <div>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-lg font-display font-semibold">Today's Outfit</h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-lg font-display font-semibold">Today's Outfit</h3>
+                {aiOutfit && outfitMode === "vibe" && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-secondary/80 text-muted-foreground font-medium">
+                    Vibe-based
+                  </span>
+                )}
+              </div>
               {wearHistory.length > 0 && (
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Based on {wearHistory.length} past outfits
+                  Learning from {wearHistory.length} past outfits
                 </p>
               )}
             </div>
@@ -333,7 +396,7 @@ const Dashboard = () => {
               variant="ghost"
               size="sm"
               className="text-gold hover:text-gold/80 hover:bg-gold/5 rounded-xl transition-all"
-              onClick={generateOutfit}
+              onClick={() => generateOutfit("closet")}
               disabled={loading}
             >
               {loading
