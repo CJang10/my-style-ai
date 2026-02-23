@@ -24,18 +24,27 @@ interface ClosetItem {
   imageUrl?: string;
 }
 
-async function compressImage(file: File): Promise<{ base64: string; mediaType: string }> {
-  // Convert HEIC/HEIF (iPhone format) to JPEG first
-  const isHeic = file.type === "image/heic" || file.type === "image/heif" ||
-    file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif");
+function isHeicFile(file: File): boolean {
+  return (
+    file.type === "image/heic" ||
+    file.type === "image/heif" ||
+    file.name.toLowerCase().endsWith(".heic") ||
+    file.name.toLowerCase().endsWith(".heif")
+  );
+}
 
-  let sourceFile: File | Blob = file;
-  if (isHeic) {
-    const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
-    sourceFile = Array.isArray(converted) ? converted[0] : converted;
+async function compressImage(file: File): Promise<{ base64: string; mediaType: string; blobUrl: string }> {
+  let sourceBlob: Blob = file;
+
+  // Convert HEIC/HEIF to JPEG so browsers and Claude can read it
+  if (isHeicFile(file)) {
+    const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+    sourceBlob = Array.isArray(converted) ? converted[0] : converted;
   }
 
-  return new Promise((resolve) => {
+  const blobUrl = URL.createObjectURL(sourceBlob);
+
+  return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
       const maxDim = 1024;
@@ -45,9 +54,10 @@ async function compressImage(file: File): Promise<{ base64: string; mediaType: s
       canvas.height = img.height * ratio;
       canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-      resolve({ base64: dataUrl.split(",")[1], mediaType: "image/jpeg" });
+      resolve({ base64: dataUrl.split(",")[1], mediaType: "image/jpeg", blobUrl });
     };
-    img.src = URL.createObjectURL(sourceFile);
+    img.onerror = () => reject(new Error("Could not load image"));
+    img.src = blobUrl;
   });
 }
 
@@ -103,14 +113,18 @@ const Closet = () => {
     if (!file || !user) return;
     if (scanFileInputRef.current) scanFileInputRef.current.value = "";
 
-    const preview = URL.createObjectURL(file);
-    setScanPreview(preview);
+    const heic = isHeicFile(file);
+    const rawPreview = URL.createObjectURL(file);
+    setScanPreview(rawPreview);
     setScanning(true);
-    setItemPhoto(file);
-    setPhotoPreview(preview);
 
     try {
-      const { base64, mediaType } = await compressImage(file);
+      const { base64, mediaType, blobUrl } = await compressImage(file);
+
+      // Use the converted JPEG blob URL for preview (so it shows in Chrome)
+      setItemPhoto(file);
+      setPhotoPreview(blobUrl);
+
       const { data, error } = await supabase.functions.invoke("style-ai", {
         body: { type: "identify-item", imageBase64: base64, mediaType },
       });
@@ -125,7 +139,11 @@ const Closet = () => {
       });
       setIsScanned(true);
     } catch (e: any) {
-      toast.error("Couldn't identify item — fill in the details manually");
+      if (heic) {
+        toast.error("HEIC photo couldn't be processed. Try saving as JPEG from the Photos app, or take a screenshot first.");
+      } else {
+        toast.error("Couldn't identify item — fill in the details manually");
+      }
       setNewItem({ name: "", category: "Tops", color: "#C4A882", season: "All-Season" });
       setIsScanned(false);
     } finally {
