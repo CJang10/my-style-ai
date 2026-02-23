@@ -5,11 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Mail, Lock, ArrowRight } from "lucide-react";
+import { Mail, Lock, ArrowRight, ArrowLeft, Loader2 } from "lucide-react";
+
+type Mode = "login" | "signup" | "forgot";
 
 const Auth = () => {
   const navigate = useNavigate();
-  const [isLogin, setIsLogin] = useState(true);
+  const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,26 +19,43 @@ const Auth = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     try {
-      if (isLogin) {
+      if (mode === "login") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         navigate("/dashboard");
-      } else {
-        const { error } = await supabase.auth.signUp({
+      } else if (mode === "signup") {
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
-        toast.success("Check your email to verify your account");
+        // If email confirmation is off, session is returned immediately
+        if (data.session) {
+          navigate("/onboarding");
+        } else {
+          toast.success("Check your email to verify your account");
+        }
+      } else {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth`,
+        });
+        if (error) throw error;
+        toast.success("Password reset link sent — check your email");
+        setMode("login");
       }
     } catch (error: any) {
       toast.error(error.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const titles: Record<Mode, string> = {
+    login: "Welcome back",
+    signup: "Create your account",
+    forgot: "Reset your password",
   };
 
   return (
@@ -46,9 +65,7 @@ const Auth = () => {
           <h1 className="text-4xl font-display font-bold tracking-tight">
             Style<span className="text-gold italic">Vault</span>
           </h1>
-          <p className="text-muted-foreground mt-2">
-            {isLogin ? "Welcome back" : "Create your account"}
-          </p>
+          <p className="text-muted-foreground mt-2">{titles[mode]}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -65,40 +82,67 @@ const Auth = () => {
               required
             />
           </div>
-          <div>
-            <Label className="text-sm font-medium flex items-center gap-2">
-              <Lock className="w-4 h-4 text-gold" /> Password
-            </Label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Min 6 characters"
-              className="mt-1.5 bg-card"
-              required
-              minLength={6}
-            />
-          </div>
+
+          {mode !== "forgot" && (
+            <div>
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Lock className="w-4 h-4 text-gold" /> Password
+              </Label>
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Min 6 characters"
+                className="mt-1.5 bg-card"
+                required
+                minLength={6}
+              />
+              {mode === "login" && (
+                <div className="flex justify-end mt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setMode("forgot")}
+                    className="text-xs text-muted-foreground hover:text-gold transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           <Button
             type="submit"
             disabled={loading}
             className="w-full gradient-gold text-primary-foreground hover:opacity-90"
           >
-            {loading ? "..." : isLogin ? "Sign In" : "Create Account"}
-            <ArrowRight className="w-4 h-4 ml-2" />
+            {loading
+              ? <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              : <ArrowRight className="w-4 h-4 mr-2" />}
+            {mode === "login" ? "Sign In" : mode === "signup" ? "Create Account" : "Send Reset Link"}
           </Button>
         </form>
 
-        <p className="text-center text-sm text-muted-foreground mt-6">
-          {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
-          <button
-            onClick={() => setIsLogin(!isLogin)}
-            className="text-gold font-medium hover:underline"
-          >
-            {isLogin ? "Sign up" : "Sign in"}
-          </button>
-        </p>
+        <div className="mt-6 text-center">
+          {mode === "forgot" ? (
+            <button
+              onClick={() => setMode("login")}
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Back to sign in
+            </button>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {mode === "login" ? "Don't have an account?" : "Already have an account?"}{" "}
+              <button
+                onClick={() => setMode(mode === "login" ? "signup" : "login")}
+                className="text-gold font-medium hover:underline"
+              >
+                {mode === "login" ? "Sign up" : "Sign in"}
+              </button>
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

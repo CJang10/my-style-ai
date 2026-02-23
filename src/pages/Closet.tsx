@@ -83,6 +83,9 @@ const Closet = () => {
   const [scanning, setScanning] = useState(false);
   const [scanPreview, setScanPreview] = useState<string | null>(null);
   const [isScanned, setIsScanned] = useState(false);
+  const [editingItem, setEditingItem] = useState<ClosetItem | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editData, setEditData] = useState({ name: "", category: "Tops", color: "#C4A882", season: "All-Season" });
 
   useEffect(() => {
     if (!user) return;
@@ -200,6 +203,39 @@ const Closet = () => {
       loadItems();
     } catch (e: any) {
       toast.error(e.message || "Failed to add item");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openEdit = (item: ClosetItem) => {
+    setEditingItem(item);
+    setEditData({
+      name: item.name,
+      category: item.category,
+      color: item.color || "#C4A882",
+      season: item.season || "All-Season",
+    });
+    setEditDialogOpen(true);
+  };
+
+  const updateItem = async () => {
+    if (!editingItem || !user) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("closet_items").update({
+        name: editData.name,
+        category: editData.category,
+        color: editData.color,
+        season: editData.season,
+      }).eq("id", editingItem.id);
+      if (error) throw error;
+      toast.success("Item updated");
+      setEditDialogOpen(false);
+      setEditingItem(null);
+      loadItems();
+    } catch (e: any) {
+      toast.error(e.message || "Failed to update item");
     } finally {
       setSaving(false);
     }
@@ -449,6 +485,80 @@ const Closet = () => {
           </div>
         </div>
 
+        {/* Edit item dialog */}
+        <Dialog open={editDialogOpen} onOpenChange={(open) => { setEditDialogOpen(open); if (!open) setEditingItem(null); }}>
+          <DialogContent className="rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="font-display">Edit Item</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-1">
+              <div>
+                <Label className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Name</Label>
+                <Input
+                  value={editData.name}
+                  onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                  className="mt-1.5 bg-card rounded-xl"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Category</Label>
+                  <Select value={editData.category} onValueChange={(v) => setEditData({ ...editData, category: v })}>
+                    <SelectTrigger className="mt-1.5 bg-card rounded-xl"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.filter((c) => c !== "All").map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Season</Label>
+                  <Select value={editData.season} onValueChange={(v) => setEditData({ ...editData, season: v })}>
+                    <SelectTrigger className="mt-1.5 bg-card rounded-xl"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {SEASONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs uppercase tracking-widest text-muted-foreground font-medium">Primary Color</Label>
+                <div className="flex gap-2 mt-1.5 items-center">
+                  <input
+                    type="color"
+                    value={editData.color}
+                    onChange={(e) => setEditData({ ...editData, color: e.target.value })}
+                    className="w-10 h-10 rounded-xl border border-border cursor-pointer flex-shrink-0"
+                  />
+                  <Input
+                    value={editData.color}
+                    onChange={(e) => setEditData({ ...editData, color: e.target.value })}
+                    className="bg-card rounded-xl"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button
+                  onClick={updateItem}
+                  disabled={saving || !editData.name}
+                  className="flex-1 gradient-gold text-primary-foreground rounded-xl shadow-gold"
+                >
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Save Changes
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => { setEditDialogOpen(false); if (editingItem) deleteItem(editingItem); }}
+                  className="rounded-xl border-border/70 text-destructive hover:text-destructive hover:bg-destructive/5"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -482,8 +592,9 @@ const Closet = () => {
           {filtered.map((item, i) => (
             <div
               key={item.id}
-              className="group opacity-0 animate-fade-in relative"
+              className="group opacity-0 animate-fade-in relative cursor-pointer"
               style={{ animationDelay: `${i * 40}ms` }}
+              onClick={() => openEdit(item)}
             >
               <div className="aspect-square rounded-2xl overflow-hidden shadow-sm ring-1 ring-border/40 transition-transform duration-200 group-hover:scale-[1.04] group-hover:shadow-md">
                 {item.imageUrl ? (
@@ -493,7 +604,7 @@ const Closet = () => {
                 )}
               </div>
               <button
-                onClick={() => deleteItem(item)}
+                onClick={(e) => { e.stopPropagation(); deleteItem(item); }}
                 className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-foreground/70 backdrop-blur-sm items-center justify-center hidden group-hover:flex transition-all"
               >
                 <Trash2 className="w-3 h-3 text-background" />
