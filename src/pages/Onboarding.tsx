@@ -87,7 +87,7 @@ const Onboarding = () => {
         occupation: profile.occupation,
         styles: profile.styles,
         budget: profile.budget,
-      });
+      }, { onConflict: "user_id" });
       if (profileError) throw profileError;
 
       // Upload photos
