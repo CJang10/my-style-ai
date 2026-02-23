@@ -3,6 +3,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Plus, Search, Camera, X, Trash2, Sparkles, Loader2 } from "lucide-react";
+import heic2any from "heic2any";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -24,6 +25,16 @@ interface ClosetItem {
 }
 
 async function compressImage(file: File): Promise<{ base64: string; mediaType: string }> {
+  // Convert HEIC/HEIF (iPhone format) to JPEG first
+  const isHeic = file.type === "image/heic" || file.type === "image/heif" ||
+    file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif");
+
+  let sourceFile: File | Blob = file;
+  if (isHeic) {
+    const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
+    sourceFile = Array.isArray(converted) ? converted[0] : converted;
+  }
+
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -36,7 +47,7 @@ async function compressImage(file: File): Promise<{ base64: string; mediaType: s
       const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
       resolve({ base64: dataUrl.split(",")[1], mediaType: "image/jpeg" });
     };
-    img.src = URL.createObjectURL(file);
+    img.src = URL.createObjectURL(sourceFile);
   });
 }
 
