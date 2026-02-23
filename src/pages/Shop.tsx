@@ -122,10 +122,8 @@ const Shop = () => {
         const saved = (data as any).favorites;
         if (Array.isArray(saved) && saved.length > 0) {
           if (typeof saved[0] === "object") {
-            // New format — full item objects
             setFavorites(saved as Recommendation[]);
           } else {
-            // Old format — just strings, clear it out since we can't recover full data
             supabase.from("profiles").update({ favorites: [] } as any).eq("user_id", data.user_id);
           }
         }
@@ -133,13 +131,28 @@ const Shop = () => {
     });
   }, [user]);
 
+  // Auto-generate on first visit once profile is ready
+  useEffect(() => {
+    if (profile && user && recommendations === null && !loading) {
+      generateRecs();
+    }
+  }, [profile]);
+
   const generateRecs = async () => {
     if (!profile || !user) return;
     setLoading(true);
     try {
-      const { data: closetItems } = await supabase.from("closet_items").select("name, category, color, season").eq("user_id", user.id);
+      const [{ data: closetItems }, { data: stylePhotoRows }] = await Promise.all([
+        supabase.from("closet_items").select("name, category, color, season").eq("user_id", user.id),
+        supabase.from("style_photos").select("storage_path").eq("user_id", user.id).limit(5),
+      ]);
+
+      const stylePhotos = (stylePhotoRows || [])
+        .map((row) => supabase.storage.from("style-photos").getPublicUrl(row.storage_path).data.publicUrl)
+        .filter((url) => !/\.heic$/i.test(url));
+
       const { data, error } = await supabase.functions.invoke("style-ai", {
-        body: { type: "shopping", profile, closetItems: closetItems || [] },
+        body: { type: "shopping", profile, closetItems: closetItems || [], stylePhotos },
       });
       if (error) throw error;
       if (data?.recommendations) setRecommendations(data.recommendations);

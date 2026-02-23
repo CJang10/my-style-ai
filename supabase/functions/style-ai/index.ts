@@ -90,15 +90,27 @@ Return only the JSON object, nothing else.`,
         : "";
 
       if (mode === "vibe") {
-        systemPrompt = `You are StyleVault, an elite personal stylist AI. The user hasn't fully built their closet yet, so generate a complete outfit based purely on their style profile, lifestyle, weather, and occasion. Suggest specific, realistic items they likely own or would suit them perfectly. Be fashion-forward and practical. Return JSON: { "outfit": [{ "item": "specific item description", "category": "category", "styling_tip": "brief tip" }], "style_note": "outfit commentary — mention this is curated from their style profile", "weather_tip": "weather-specific advice" }`;
-        userPrompt = `Profile: ${JSON.stringify(profile)}\nWeather: ${JSON.stringify(weather)}\nOccasion: ${occasion}\n\nCreate a complete ${occasion} outfit tailored to their style, lifestyle, and current weather. These are style-profile suggestions since their closet is still being built.`;
+        const hasVibePhotos = Array.isArray(stylePhotos) && stylePhotos.length > 0;
+        if (hasVibePhotos) {
+          systemPrompt = `You are StyleVault, an elite personal stylist AI. The user has shared photos of outfits they actually wear — treat these as their style DNA. Study the silhouettes, color palette, fit, layering, and overall aesthetic across all photos. Then use their profile, weather, and occasion to assemble a complete outfit that feels true to who they are. Suggest specific, realistic pieces they likely own or that would seamlessly fit into their wardrobe. Be fashion-forward and practical. Return JSON: { "outfit": [{ "item": "specific item description", "category": "category", "styling_tip": "brief tip" }], "style_note": "outfit commentary that references their specific aesthetic", "weather_tip": "weather-specific advice" }`;
+          userPrompt = `These photos show exactly how this person dresses — their real aesthetic and style DNA. Use them as your foundation.\n\nProfile: ${JSON.stringify(profile)}\nWeather: ${JSON.stringify(weather)}\nOccasion: ${occasion}\n\nCreate a complete ${occasion} outfit that feels like a natural extension of their style.`;
+        } else {
+          systemPrompt = `You are StyleVault, an elite personal stylist AI. The user hasn't fully built their closet yet, so generate a complete outfit based purely on their style profile, lifestyle, weather, and occasion. Suggest specific, realistic items they likely own or would suit them perfectly. Be fashion-forward and practical. Return JSON: { "outfit": [{ "item": "specific item description", "category": "category", "styling_tip": "brief tip" }], "style_note": "outfit commentary — mention this is curated from their style profile", "weather_tip": "weather-specific advice" }`;
+          userPrompt = `Profile: ${JSON.stringify(profile)}\nWeather: ${JSON.stringify(weather)}\nOccasion: ${occasion}\n\nCreate a complete ${occasion} outfit tailored to their style, lifestyle, and current weather. These are style-profile suggestions since their closet is still being built.`;
+        }
       } else {
         systemPrompt = `You are StyleVault, an elite personal stylist AI. You create outfits strictly from the user's actual closet items based on weather, occasion, their style preferences, occupation, and age. Only use items that exist in their closet. Avoid repeating recent outfit combinations. Be specific, fashion-forward, and practical. Return a JSON object with: { "outfit": [{ "item": "item name from closet", "category": "category", "styling_tip": "brief tip" }], "style_note": "overall outfit commentary", "weather_tip": "weather-specific advice" }`;
         userPrompt = `Profile: ${JSON.stringify(profile)}\nWeather: ${JSON.stringify(weather)}\nOccasion: ${occasion}\nCloset items: ${JSON.stringify(closetItems)}${recentWears}\n\nCreate today's ${occasion} outfit using only items from their closet.`;
       }
     } else if (type === "shopping") {
-      systemPrompt = `You are StyleVault, a personal shopping assistant. Analyze the user's closet, style, budget, and lifestyle to recommend specific items they should buy. Focus on filling gaps, upgrading basics, and matching their aesthetic. Return JSON: { "recommendations": [{ "name": "item name", "brand": "brand", "price": number, "reason": "why they need this", "match_score": number (0-100), "tags": ["tag1", "tag2"] }] }`;
-      userPrompt = `Profile: ${JSON.stringify(profile)}\nCurrent closet: ${JSON.stringify(closetItems)}\n\nRecommend 6 items to buy.`;
+      const hasPhotos = Array.isArray(stylePhotos) && stylePhotos.length > 0;
+      if (hasPhotos) {
+        systemPrompt = `You are StyleVault, an elite personal stylist with decades of luxury fashion experience. The user has shared photos of outfits they actually wear — treat these as their style DNA. Before recommending anything, deeply study the photos: the silhouettes they favor, their color palette, how they layer, fit preferences (relaxed vs. tailored), the formality level, and the overall aesthetic across all photos. Then cross-reference their current closet and lifestyle to identify real gaps. Recommend 6 specific items that would feel like natural, effortless extensions of their existing wardrobe — pieces they would reach for immediately. Each reason must feel personally curated, referencing their actual aesthetic visible in the photos. Return JSON: { "recommendations": [{ "name": "specific item name", "brand": "realistic brand name", "price": number, "reason": "personalized reason referencing their specific aesthetic from the photos", "match_score": number (0-100), "tags": ["tag1", "tag2"] }] }`;
+        userPrompt = `These photos show exactly how this person dresses — their real aesthetic and style DNA. Study them carefully before making any recommendations.\n\nProfile: ${JSON.stringify(profile)}\nCurrent closet: ${JSON.stringify(closetItems)}\n\nRecommend 6 items that feel like they were handpicked for this exact person — natural extensions of their wardrobe that fill real gaps.`;
+      } else {
+        systemPrompt = `You are StyleVault, an elite personal stylist AI. Analyze the user's style preferences, closet, budget, and lifestyle to recommend specific items they should buy. Focus on filling gaps, upgrading basics, and matching their aesthetic. Return JSON: { "recommendations": [{ "name": "item name", "brand": "brand", "price": number, "reason": "why they need this", "match_score": number (0-100), "tags": ["tag1", "tag2"] }] }`;
+        userPrompt = `Profile: ${JSON.stringify(profile)}\nCurrent closet: ${JSON.stringify(closetItems)}\n\nRecommend 6 items to buy.`;
+      }
     } else if (type === "analyze-photo") {
       systemPrompt = `You are StyleVault, a fashion analysis AI. Analyze the outfit in the uploaded photo and extract: colors, style category, formality level, season suitability, and key pieces. Return JSON: { "colors": ["color1"], "style": "style category", "formality": "casual/smart-casual/business/formal", "season": "season", "pieces": ["piece1"], "notes": "brief style analysis" }`;
       userPrompt = `Analyze this outfit photo and extract style data.`;
@@ -107,14 +119,25 @@ Return only the JSON object, nothing else.`,
     }
 
     const messages: any[] = [];
-    if (type === "analyze-photo" && stylePhotos?.[0]) {
+    const photoUrls = Array.isArray(stylePhotos) ? stylePhotos : [];
+
+    if (type === "analyze-photo" && photoUrls[0]) {
       messages.push({
         role: "user",
         content: [
           { type: "text", text: userPrompt },
-          { type: "image", source: { type: "url", url: stylePhotos[0] } },
+          { type: "image", source: { type: "url", url: photoUrls[0] } },
         ],
       });
+    } else if (
+      (type === "shopping" || (type === "daily-outfit" && body.mode === "vibe")) &&
+      photoUrls.length > 0
+    ) {
+      const content: any[] = [{ type: "text", text: userPrompt }];
+      for (const url of photoUrls.slice(0, 5)) {
+        content.push({ type: "image", source: { type: "url", url } });
+      }
+      messages.push({ role: "user", content });
     } else {
       messages.push({ role: "user", content: userPrompt });
     }
@@ -128,7 +151,7 @@ Return only the JSON object, nothing else.`,
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
+        max_tokens: type === "shopping" ? 1500 : 1024,
         system: systemPrompt,
         messages,
       }),

@@ -33,7 +33,7 @@ function isHeicFile(file: File): boolean {
   );
 }
 
-async function compressImage(file: File): Promise<{ base64: string; mediaType: string; blobUrl: string }> {
+async function compressImage(file: File): Promise<{ base64: string; mediaType: string; blobUrl: string; canvasBlob: Blob }> {
   let sourceBlob: Blob = file;
 
   // Convert HEIC/HEIF to JPEG so browsers and Claude can read it
@@ -54,7 +54,14 @@ async function compressImage(file: File): Promise<{ base64: string; mediaType: s
       canvas.height = img.height * ratio;
       canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-      resolve({ base64: dataUrl.split(",")[1], mediaType: "image/jpeg", blobUrl });
+      canvas.toBlob(
+        (canvasBlob) => {
+          if (!canvasBlob) { reject(new Error("Canvas conversion failed")); return; }
+          resolve({ base64: dataUrl.split(",")[1], mediaType: "image/jpeg", blobUrl, canvasBlob });
+        },
+        "image/jpeg",
+        0.85
+      );
     };
     img.onerror = () => reject(new Error("Could not load image"));
     img.src = blobUrl;
@@ -119,10 +126,12 @@ const Closet = () => {
     setScanning(true);
 
     try {
-      const { base64, mediaType, blobUrl } = await compressImage(file);
+      const { base64, mediaType, blobUrl, canvasBlob } = await compressImage(file);
 
-      // Use the converted JPEG blob URL for preview (so it shows in Chrome)
-      setItemPhoto(file);
+      // Always store a JPEG for upload — this fixes HEIC files which can't be displayed by browsers
+      const baseName = file.name.replace(/\.[^.]+$/, ".jpg");
+      const storageFile = new File([canvasBlob], baseName, { type: "image/jpeg" });
+      setItemPhoto(storageFile);
       setPhotoPreview(blobUrl);
 
       const { data, error } = await supabase.functions.invoke("style-ai", {

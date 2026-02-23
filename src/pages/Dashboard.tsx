@@ -175,6 +175,19 @@ const Dashboard = () => {
     setLoading(true);
     setWornToday(false);
     try {
+      // For vibe mode, fetch style photos so the AI can see the user's real aesthetic
+      let stylePhotos: string[] = [];
+      if (mode === "vibe") {
+        const { data: photoRows } = await supabase
+          .from("style_photos")
+          .select("storage_path")
+          .eq("user_id", user!.id)
+          .limit(4);
+        stylePhotos = (photoRows || [])
+          .map((row: any) => supabase.storage.from("style-photos").getPublicUrl(row.storage_path).data.publicUrl)
+          .filter((url: string) => !/\.heic$/i.test(url));
+      }
+
       const { data, error } = await supabase.functions.invoke("style-ai", {
         body: {
           type: "daily-outfit",
@@ -188,6 +201,7 @@ const Dashboard = () => {
           })),
           weather,
           occasion,
+          stylePhotos,
           wearHistory: wearHistory.slice(0, 7).map((h) => ({
             date: h.worn_date,
             occasion: h.occasion,
