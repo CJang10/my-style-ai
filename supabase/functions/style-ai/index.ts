@@ -84,8 +84,12 @@ Return only the JSON object, nothing else.`,
     let userPrompt = "";
 
     if (type === "daily-outfit") {
-      systemPrompt = `You are StyleVault, an elite personal stylist AI. You create outfits from the user's actual closet items based on weather, their style preferences, occupation, and age. Be specific, fashion-forward, and practical. Return a JSON object with: { "outfit": [{ "item": "item name from closet", "category": "category", "styling_tip": "brief tip" }], "style_note": "overall outfit commentary", "weather_tip": "weather-specific advice" }`;
-      userPrompt = `Profile: ${JSON.stringify(profile)}\nWeather: ${JSON.stringify(weather)}\nCloset items: ${JSON.stringify(closetItems)}\n\nCreate today's outfit recommendation.`;
+      const { occasion = "casual", wearHistory = [] } = body;
+      const recentWears = wearHistory.length > 0
+        ? `\n\nRecent outfits worn (avoid repeating the same combinations):\n${wearHistory.map((h: any) => `- ${h.date} (${h.occasion}): ${h.items.join(", ")}`).join("\n")}`
+        : "";
+      systemPrompt = `You are StyleVault, an elite personal stylist AI. You create outfits from the user's actual closet items based on weather, occasion, their style preferences, occupation, and age. Avoid repeating recent outfit combinations. Be specific, fashion-forward, and practical. Return a JSON object with: { "outfit": [{ "item": "item name from closet", "category": "category", "styling_tip": "brief tip" }], "style_note": "overall outfit commentary", "weather_tip": "weather-specific advice" }`;
+      userPrompt = `Profile: ${JSON.stringify(profile)}\nWeather: ${JSON.stringify(weather)}\nOccasion: ${occasion}\nCloset items: ${JSON.stringify(closetItems)}${recentWears}\n\nCreate today's ${occasion} outfit recommendation.`;
     } else if (type === "shopping") {
       systemPrompt = `You are StyleVault, a personal shopping assistant. Analyze the user's closet, style, budget, and lifestyle to recommend specific items they should buy. Focus on filling gaps, upgrading basics, and matching their aesthetic. Return JSON: { "recommendations": [{ "name": "item name", "brand": "brand", "price": number, "reason": "why they need this", "match_score": number (0-100), "tags": ["tag1", "tag2"] }] }`;
       userPrompt = `Profile: ${JSON.stringify(profile)}\nCurrent closet: ${JSON.stringify(closetItems)}\n\nRecommend 6 items to buy.`;
